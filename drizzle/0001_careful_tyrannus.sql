@@ -1,0 +1,2 @@
+ALTER TABLE "variables" ADD COLUMN "flow_version_id" uuid;--> statement-breakpoint
+ALTER TABLE "variables" ADD CONSTRAINT "variables_flow_version_id_flow_versions_id_fk" FOREIGN KEY ("flow_version_id") REFERENCES "public"."flow_versions"("id") ON DELETE no action ON UPDATE no action;

@@ -1,0 +1,1 @@
+ALTER TABLE "nodes" ALTER COLUMN "type" SET DEFAULT 'question';
