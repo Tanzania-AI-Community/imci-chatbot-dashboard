@@ -14,7 +14,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const providedApiKey = authHeader.substring(7); // Remove "Bearer " prefix
+    const providedApiKey = authHeader.substring(7);
 
     // Get the stored encrypted API key
     const encryptedApiKey = await getEncryptedApiKey();
@@ -41,78 +41,76 @@ export async function GET(request: Request) {
       );
     }
 
-    // Transform the data to match the JSON viewer format
-    const flowsData = result.data.map((item) => ({
-      meta: {
-        id: item.version.flow_id,
-        name: item.version.flow_name,
-        description: null, // We don't have flow description in version data
-        status: item.version.status,
-        created_at: item.version.created_at,
-        updated_at: null, // We don't have updated_at in version data
-      },
-      version: {
+    // Transform the data to match the Flow Editor's JSON view structure
+    const flowsData = result.data.map((item: any) => {
+      const version = {
         id: item.version.id,
-        number: item.version.version_number,
         status: item.version.status,
+        version_number: item.version.version_number,
+        entry_conditions: item.version.entry_conditions || [],
         created_at: item.version.created_at,
         published_at: item.version.published_at,
-      },
-      entry_conditions: item.version.entry_conditions || [],
-      variables: item.variables.map((variable: any) => ({
-        id: variable.id,
-        name: variable.name,
-        type: variable.type,
-        description: variable.description ?? undefined,
-        default_value: variable.default_value,
-        is_global: variable.is_global,
-      })),
-      diagnoses: item.diagnoses.map((diagnosis: any) => ({
-        id: diagnosis.id,
-        name: diagnosis.name,
-        description: diagnosis.description ?? undefined,
-        conditions:
-          diagnosis.conditions?.map((condition: any) => ({
-            id: condition.id,
-            operator: condition.operator,
-            value: condition.value,
-            logical_operator: condition.logical_operator,
-            variable_id: condition.variable_id,
-          })) || [],
-        medications:
-          diagnosis.medications?.map((medication: any) => ({
-            id: medication.id,
-            name: medication.medication?.name,
-            dosage: medication.dosage,
-            duration: medication.duration,
-            instructions: medication.instructions,
-          })) || [],
-        advice:
-          diagnosis.advice?.map((advice: any) => ({
-            id: advice.id,
-            content: advice.advice_text,
-            category: advice.category,
-            priority: advice.priority,
-          })) || [],
-      })),
-      nodes: item.nodes.map((node: any) => ({
-        id: node.id,
-        type: node.type,
-        content: node.content,
-        next: node.next,
-        conditions: node.conditions,
-        variables: node.variables,
-      })),
-      conditions: item.conditions.map((condition: any) => ({
-        id: condition.id,
-        operator: condition.operator,
-        value: condition.value,
-        logical_operator: condition.logical_operator,
-        variable_id: condition.variable_id,
-        type: condition.type,
-        reference_id: condition.reference_id,
-      })),
-    }));
+        flow_name: item.version.flow_name,
+      };
+
+      // Compose the flowData object
+      const flowData = {
+        nodes: item.nodes.map((node: any) => ({
+          id: node.id,
+          type: node.type,
+          content: node.content,
+          next: node.next,
+          conditions: node.conditions,
+          variables: node.variables,
+        })),
+        variables: item.variables.map((variable: any) => ({
+          id: variable.id,
+          name: variable.name,
+          type: variable.type,
+          description: variable.description ?? undefined,
+          default_value: variable.default_value,
+          is_global: variable.is_global,
+        })),
+        conditions: [
+          // Entry conditions (type: 'entry')
+          ...(item.version.entry_conditions || []).map((c: any) => ({
+            ...c,
+            type: "entry",
+          })),
+          // Other conditions (type: 'diagnosis' or as provided)
+          ...(item.conditions || []).map((c: any) => ({
+            ...c,
+            type: c.type || "diagnosis",
+          })),
+        ],
+        diagnoses: item.diagnoses.map((diagnosis: any) => ({
+          ...diagnosis,
+          conditions: (diagnosis.conditions || []).map((c: any) => ({
+            ...c,
+            operator: c.operator,
+            type: c.type || "diagnosis",
+          })),
+          medications: (diagnosis.medications || []).map((m: any) => ({
+            ...m,
+            medication: m.medication ? { name: m.medication.name } : undefined,
+          })),
+          advice: (diagnosis.advice || []).map((a: any) => ({
+            ...a,
+            category: a.category ?? null,
+          })),
+        })),
+        flow: {
+          id: item.version.flow_id,
+          name: item.version.flow_name,
+          description: item.version.flow_description ?? null,
+          status: item.version.status,
+          created_at: item.version.created_at,
+          updated_at: item.version.updated_at ?? null,
+        },
+      };
+
+      return { version, flowData };
+    });
 
     return NextResponse.json({
       success: true,
